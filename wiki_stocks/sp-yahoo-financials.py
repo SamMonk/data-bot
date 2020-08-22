@@ -15,6 +15,11 @@ import datetime
 Base.metadata.create_all(engine)
 session = Session()
 #{"GET":{"scheme":"https","host":"query1.finance.yahoo.com","filename":"/v8/finance/chart/AAPL","query":{"region":"US","lang":"en-US","includePrePost":"false","interval":"2m","range":"1d","corsDomain":"finance.yahoo.com",".tsrc":"finance"},"remote":{"Address":"68.180.135.252:443"}}}
+#{"GET":{"scheme":"https","host":"query1.finance.yahoo.com","filename":"/v7/finance/quote","query":{"formatted":"true","crumb":"sD0gBL8xdVS","lang":"en-US","region":"US","symbols":"AAPL","fields":"messageBoardId,longName,shortName,marketCap,underlyingSymbol,underlyingExchangeSymbol,headSymbolAsString,regularMarketPrice,regularMarketChange,regularMarketChangePercent,regularMarketVolume,uuid,regularMarketOpen,fiftyTwoWeekLow,fiftyTwoWeekHigh,toCurrency,fromCurrency,toExchange,fromExchange","corsDomain":"finance.yahoo.com"},"remote":{"Address":"68.180.135.252:443"}}}
+# Dividend data on main page
+# https://finance.yahoo.com/quote/AAPL
+# https://query1.finance.yahoo.com/v8/finance/chart/AAPL?region=US&lang=en-US&includePrePost=false&interval=2m&range=1d&corsDomain=finance.yahoo.com&.tsrc=finance
+# https://query1.finance.yahoo.com/v7/finance/quote?formatted=true&crumb=sD0gBL8xdVS&lang=en-US&region=US&symbols=AAPL&fields=messageBoardId%2ClongName%2CshortName%2CmarketCap%2CunderlyingSymbol%2CunderlyingExchangeSymbol%2CheadSymbolAsString%2CregularMarketPrice%2CregularMarketChange%2CregularMarketChangePercent%2CregularMarketVolume%2Cuuid%2CregularMarketOpen%2CfiftyTwoWeekLow%2CfiftyTwoWeekHigh%2CtoCurrency%2CfromCurrency%2CtoExchange%2CfromExchange&corsDomain=finance.yahoo.com
 session.flush()
 
 with open('./wiki_stocks/sp500tickers.json') as f:
