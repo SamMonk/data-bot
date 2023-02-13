@@ -12,8 +12,8 @@ def save_sp500_tickers():
         sector = row.findAll('td')[3].text.strip()
         industry = row.findAll('td')[4].text.strip()
         print(row.findAll('td')[2])
-        reports = row.findAll('td')[2].find('a')['href'].strip()
-        tickers['stocks'].append({"ticker":ticker,"sector":sector,"industry":industry,"reports":reports})
+        #reports = row.findAll('td')[2].find('a')['href'].strip()
+        tickers['stocks'].append({"ticker":ticker,"sector":sector,"industry":industry})#,"reports":reports})
         print(ticker)
         
     with open("wiki_stocks/sp500tickers.json","w") as f:
