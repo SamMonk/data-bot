@@ -1,8 +1,10 @@
 import bs4 as bs
 import json
 import requests
+import time
 
 def save_sp500_tickers():
+    tic = time.perf_counter()
     resp = requests.get('http://en.wikipedia.org/wiki/List_of_S%26P_500_companies')
     soup = bs.BeautifulSoup(resp.text, 'lxml')
     table = soup.find('table', {'class': 'wikitable sortable'})
@@ -18,7 +20,8 @@ def save_sp500_tickers():
         
     with open("wiki_stocks/sp500tickers.json","w") as f:
         json.dump(tickers,f)
-        
+    toc = time.perf_counter()
+    print(f"Retrieved sp500 tickers in {toc - tic:0.4f} seconds")
     return tickers
 
 #save_sp500_tickers()
