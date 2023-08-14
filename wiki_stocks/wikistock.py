@@ -32,6 +32,7 @@ class TickerData(Base):
     )
 
     def __init__(self, wiki_ticker, financial_type, record_date, record_value):
+        print('wiki')
         self.wiki_ticker = wiki_ticker
         self.financial_type = financial_type
         self.record_date = record_date
