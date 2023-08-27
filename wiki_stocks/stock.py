@@ -18,11 +18,11 @@ class TickerData(Base):
     )
 
     def __init__(self, sp_ticker, financial_type, period_type, record_date, record_value):
-        print('sp')
-        print(sp_ticker)
-        print(financial_type)
-        print(record_date)
-        print(record_value)
+        # print('sp')
+        # print(sp_ticker)
+        # print(financial_type)
+        # print(record_date)
+        # print(record_value)
         self.sp_ticker = sp_ticker
         self.financial_type = financial_type
         self.period_type = period_type

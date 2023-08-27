@@ -1,0 +1,44 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Chimney Rock"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -82.25031424444008,
+          35.43279804890467
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Cabin: 843 Rainbow Circle"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -82.17863291237647,
+          35.43322252096944
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Asheville Baseball"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -82.54954723517743,
+          35.58744943607039
+        ]
+      }
+    }
+  ]
+}
