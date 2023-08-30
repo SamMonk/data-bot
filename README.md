@@ -1,9 +1,15 @@
 # data-bot
+
+The data sources for the various monkcode.com sites.
+
 Harvesting data automatically
 
-Start with capturing data in both sqlite and JSON for https://finance.yahoo.com/screener/6039bb71-c189-4b62-ab6d-6dbd659495bb?count=25&offset=25
+Start with capturing data from the internet about subjects that matter to us:
 
-craigslist and facebook markeplace analysis, marklet research
+I prefer to keep small data sets in json and sqlite for larger datasets. 
+
+I also have some preference for postgres if I need a shared central database with the ability to search spatial data.
+
 
 #### Geocoding
 https://geocoding.geo.census.gov/geocoder/Geocoding_Services_API.html
@@ -11,6 +17,9 @@ https://geocoding.geo.census.gov/geocoder/locations/onelineaddress?address=410+V
 
 # Build DataSets
 
+craigslist and facebook markeplace analysis, marklet research
+geojson
+s and p stock valuation data
 
 ## Products
 
@@ -60,7 +69,9 @@ requests.exceptions.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
 
 period1={int(time.time())}&period2={int(time.time())}&
 
+<!-- 
 cash_flow_annual = requests.get(f'https://query2.finance.yahoo.com/ws/fundamentals-timeseries/v1/finance/timeseries/{stock["ticker"]}?lang=en-US&region=US&symbol={stock["ticker"]}&padTimeSeries=true&type=annualFreeCashFlow%2CtrailingFreeCashFlow%2CannualCapitalExpenditure%2CtrailingCapitalExpenditure%2CannualOperatingCashFlow%2CtrailingOperatingCashFlow%2CannualEndCashPosition%2CtrailingEndCashPosition%2CannualBeginningCashPosition%2CtrailingBeginningCashPosition%2CannualChangeInCashSupplementalAsReported%2CtrailingChangeInCashSupplementalAsReported%2CannualCashFlowFromContinuingFinancingActivities%2CtrailingCashFlowFromContinuingFinancingActivities%2CannualNetOtherFinancingCharges%2CtrailingNetOtherFinancingCharges%2CannualCashDividendsPaid%2CtrailingCashDividendsPaid%2CannualRepurchaseOfCapitalStock%2CtrailingRepurchaseOfCapitalStock%2CannualCommonStockIssuance%2CtrailingCommonStockIssuance%2CannualRepaymentOfDebt%2CtrailingRepaymentOfDebt%2CannualInvestingCashFlow%2CtrailingInvestingCashFlow%2CannualNetOtherInvestingChanges%2CtrailingNetOtherInvestingChanges%2CannualSaleOfInvestment%2CtrailingSaleOfInvestment%2CannualPurchaseOfInvestment%2CtrailingPurchaseOfInvestment%2CannualPurchaseOfBusiness%2CtrailingPurchaseOfBusiness%2CannualOtherNonCashItems%2CtrailingOtherNonCashItems%2CannualChangeInAccountPayable%2CtrailingChangeInAccountPayable%2CannualChangeInInventory%2CtrailingChangeInInventory%2CannualChangesInAccountReceivables%2CtrailingChangesInAccountReceivables%2CannualChangeInWorkingCapital%2CtrailingChangeInWorkingCapital%2CannualStockBasedCompensation%2CtrailingStockBasedCompensation%2CannualDeferredIncomeTax%2CtrailingDeferredIncomeTax%2CannualDepreciationAndAmortization%2CtrailingDepreciationAndAmortization%2CannualNetIncome%2CtrailingNetIncome&merge=false&corsDomain=finance.yahoo.com')
+-->
 
 grep -R --exclude-dir=venv --include=\*.py 'yahoo' .
 
@@ -71,3 +82,5 @@ java -jar access2csv.jar CAMA_DATA_EXPORT_WEB.accdb
 sqlite3 database.db ".mode csv" ".import VCPA_CAMA_OWNER.csv VCPA_CAMA_OWNER" ".exit"
 
 sqlite3 database.db ".mode csv" ".import VCPA_CAMA_PARCEL.csv VCPA_CAMA_PARCEL" ".exit"
+
+# 
