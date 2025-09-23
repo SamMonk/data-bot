@@ -1,0 +1,17 @@
+[remap]
+
+importer="csv_translation"
+type="Translation"
+uid="uid://cc4gbmr0e3hga"
+
+[deps]
+
+files=["res://data-bot/dividends/S&P.Date.translation", "res://data-bot/dividends/S&P.ExDate.translation", "res://data-bot/dividends/S&P.FY.translation", "res://data-bot/dividends/S&P.Percentage.translation"]
+
+source_file="res://data-bot/dividends/S&P.csv"
+dest_files=["res://data-bot/dividends/S&P.Date.translation", "res://data-bot/dividends/S&P.ExDate.translation", "res://data-bot/dividends/S&P.FY.translation", "res://data-bot/dividends/S&P.Percentage.translation"]
+
+[params]
+
+compress=true
+delimiter=0

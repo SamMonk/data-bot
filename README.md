@@ -1,5 +1,31 @@
 # data-bot
 
+## Strategy
+- **Mission**: Centralize data acquisition, enrichment, and publishing for all MonkCode properties so each Gatsby site stays fresh without manual exports.
+- **Audience/Consumers**: `alphagaldata`, `climate-gatsby`, `gatsby`, `gatsby-investing`, and ad-hoc analyses inside `../scripts`.
+- **North-star KPIs**: Successful scheduled runs, freshness of published datasets (<=24h drift for daily feeds), schema stability, and time-to-publish for new pipelines (<2 days).
+
+### Automation & Observability
+- Maintain the GitHub Action (`.github/workflows/pythonapp.yml`) as the single orchestrator. Add job-specific logs, dataset manifest checksums, and Slack/SNS notifications for failures.
+- Introduce dataset metadata (`datasets/<name>/manifest.json`) describing source URLs, update cadence, and downstream repos; publish a summary artifact for the Gatsby READMEs to reference.
+- Add unit/smoke tests for critical scrapers (e.g., Yahoo Finance, Census) and run them before committing refreshed data.
+
+### Pipeline Roadmap
+- **Dividends/Markets**: Finish migrating dividend + economic calendar scripts into modular packages consumed by `gatsby-investing`.
+- **Climate Metrics**: Stage NOAA/NASA ingestion here (currently in `climate-gatsby/scripts`) and expose a CLI per metric so the Gatsby repo simply pulls committed JSON.
+- **Alpha-Gal Map**: Convert the geojson/SQLite workflows into reproducible modules that output to `alphagaldata/src/data/` or S3 for map tiles.
+- **Shared Assets**: Store reusable datasets (occupation stats, property records) with clear versioning and checksums so `gatsby` can showcase previews.
+
+### Operations
+- **Daily**: Scheduled workflow runs `main.py` to pull priority feeds; ensure idempotency and commit only when data changed.
+- **Weekly**: Review pipeline health, update `.env.sample` / secrets guidance, and queue enhancements in this README.
+- **Monthly**: Audit dependencies (`pip-tools` or `uv`), refresh API credentials, and archive obsolete datasets.
+
+## Progress Log
+- 2025-09-22 — Added data-bot roadmap, clarified ownership of pipelines feeding the four Gatsby sites, and outlined observability upgrades.
+
+## Reference Notes
+
 The data sources for the various monkcode.com sites.
 
 Harvesting data automatically
