@@ -1,94 +1,116 @@
 #!/usr/bin/env python3
-"""Fetch Yahoo Finance Economic Calendar and publish to S3.
+"""Fetch MarketWatch Economic Calendar and publish to S3.
 
-Scrapes today's economic releases from Yahoo Finance (no JS rendering needed).
+Uses cloudscraper to bypass Cloudflare protection; parses multi-week
+calendar tables into structured events tagged with date headers.
+
 Runs every 4 hours on weekdays; writes s3://monkcode-market-data/data/econ_calendar.json
 """
 import json
 import os
+import re
 from datetime import datetime, timezone
 
 import boto3
-import requests
+import cloudscraper
 from bs4 import BeautifulSoup
 
 BUCKET = os.getenv("PUBLIC_BUCKET", "monkcode-market-data")
 KEY = "data/econ_calendar.json"
-URL = "https://finance.yahoo.com/calendar/economic"
-HEADERS = {
-    "User-Agent": (
-        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
-        "(KHTML, like Gecko) Chrome/120.0 Safari/537.36"
-    ),
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-    "Accept-Language": "en-US,en;q=0.9",
-}
+URL = "https://www.marketwatch.com/economy-politics/calendar"
 
-# Column indices in Yahoo Finance economic calendar table
-# Event | Country | Event Time | For | Actual | Market Expectation | Prior to This | Revised from
-COL_EVENT    = 0
-COL_COUNTRY  = 1
-COL_TIME     = 2
-COL_PERIOD   = 3
-COL_ACTUAL   = 4
-COL_FORECAST = 5
-COL_PREVIOUS = 6
+# Matches date header rows like "MONDAY, FEB. 23" or "FRIDAY, MARCH 6"
+_DAY_RE = re.compile(
+    r"^(MONDAY|TUESDAY|WEDNESDAY|THURSDAY|FRIDAY|SATURDAY|SUNDAY)",
+    re.IGNORECASE,
+)
+# Parses "FEB. 26" → month + day for sorting
+_MDY_RE = re.compile(
+    r"(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)[A-Z.]*\s+(\d+)",
+    re.IGNORECASE,
+)
+_MONTHS = {m: i for i, m in enumerate(
+    ["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"], 1
+)}
+
+
+def _date_sort_key(date_str: str) -> tuple:
+    """Return (month, day) for sorting date header strings."""
+    m = _MDY_RE.search(date_str)
+    if not m:
+        return (99, 99)
+    month = _MONTHS.get(m.group(1).lower(), 99)
+    return (month, int(m.group(2)))
 
 
 def parse_calendar(html: str) -> list:
     soup = BeautifulSoup(html, "html.parser")
-    table = soup.find("table")
-    if not table:
-        return []
-
     items = []
     seen = set()
-    today = datetime.now(tz=timezone.utc).strftime("%b %-d, %Y")  # e.g. "Feb 25, 2026"
+    current_date = ""
 
-    for row in table.find_all("tr")[1:]:  # skip header row
-        cells = [td.get_text(strip=True) for td in row.find_all(["td", "th"])]
-        if len(cells) < 4:
-            continue
+    for table in soup.find_all("table"):
+        for row in table.find_all("tr"):
+            cells = [
+                td.get_text(separator=" ", strip=True)
+                for td in row.find_all(["td", "th"])
+            ]
+            if not cells:
+                continue
 
-        event    = cells[COL_EVENT]    if len(cells) > COL_EVENT    else ""
-        country  = cells[COL_COUNTRY]  if len(cells) > COL_COUNTRY  else ""
-        time_val = cells[COL_TIME]     if len(cells) > COL_TIME     else ""
-        period   = cells[COL_PERIOD]   if len(cells) > COL_PERIOD   else ""
-        actual   = cells[COL_ACTUAL]   if len(cells) > COL_ACTUAL   else ""
-        forecast = cells[COL_FORECAST] if len(cells) > COL_FORECAST else ""
-        previous = cells[COL_PREVIOUS] if len(cells) > COL_PREVIOUS else ""
+            first = cells[0]
 
-        if not event:
-            continue
+            # Skip column-header rows
+            if first.lower() in ("time (et)", "time"):
+                continue
 
-        key = f"{time_val}|{event}|{country}"
-        if key in seen:
-            continue
-        seen.add(key)
+            # Date section header row (e.g. "THURSDAY, FEB. 26")
+            if _DAY_RE.match(first):
+                current_date = first
+                continue
 
-        # Format: "8:30 AM UTC (US)" for display
-        time_display = f"{time_val} ({country})" if country else time_val
+            if len(cells) < 2 or not current_date:
+                continue
 
-        items.append({
-            "date":     today,
-            "time":     time_display,
-            "event":    event,
-            "period":   period,
-            "forecast": forecast if forecast not in ("-", "") else "",
-            "previous": previous if previous not in ("-", "") else "",
-            "actual":   actual   if actual   not in ("-", "") else "",
-        })
+            event    = cells[1] if len(cells) > 1 else ""
+            if not event:
+                continue
 
-    return items[:100]
+            time_val = first
+            period   = cells[2] if len(cells) > 2 else ""
+            actual   = cells[3] if len(cells) > 3 else ""
+            forecast = cells[4] if len(cells) > 4 else ""
+            previous = cells[5] if len(cells) > 5 else ""
+
+            key = f"{current_date}|{time_val}|{event}"
+            if key in seen:
+                continue
+            seen.add(key)
+
+            items.append({
+                "date":     current_date,
+                "time":     time_val,
+                "event":    event,
+                "period":   period,
+                "actual":   actual,
+                "forecast": forecast,
+                "previous": previous,
+            })
+
+    return items
 
 
 def main():
-    resp = requests.get(URL, headers=HEADERS, timeout=20)
+    scraper = cloudscraper.create_scraper(
+        browser={"browser": "chrome", "platform": "linux", "desktop": True}
+    )
+    resp = scraper.get(URL, timeout=30)
     resp.raise_for_status()
     items = parse_calendar(resp.text)
 
     payload = {
         "fetched_at": datetime.now(tz=timezone.utc).replace(microsecond=0).isoformat(),
+        "source_url": URL,
         "items": items,
     }
 
