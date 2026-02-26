@@ -36,9 +36,6 @@ jobs:
       - name: Install dependencies
         run: pip install -r data-pipelines/market/requirements.txt
 
-      - name: Install Playwright browsers
-        run: python -m playwright install chromium --with-deps
-
       # ── Market prices + fund NAVs (only meaningful after market close) ──
       - name: Refresh market indicators
         if: github.event.schedule == '30 23 * * 1-5' || github.event_name == 'workflow_dispatch'
@@ -48,7 +45,7 @@ jobs:
       - name: Fetch Yahoo Finance Originals
         run: python data-pipelines/market/news_originals.py
 
-      - name: Fetch MarketWatch Economic Calendar
+      - name: Fetch Yahoo Finance Economic Calendar
         run: python data-pipelines/market/econ_calendar.py
 
       - name: Confirm S3 output

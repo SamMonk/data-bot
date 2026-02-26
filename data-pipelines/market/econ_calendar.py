@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
-"""Fetch MarketWatch Economic Calendar and publish to S3.
+"""Fetch Yahoo Finance Economic Calendar and publish to S3.
 
-Uses Playwright (headless Chromium) to render the JavaScript-heavy page,
-then extracts structured calendar data directly from the live DOM.
-
+Scrapes today's economic releases from Yahoo Finance (no JS rendering needed).
 Runs every 4 hours on weekdays; writes s3://monkcode-market-data/data/econ_calendar.json
 """
 import json
@@ -11,104 +9,83 @@ import os
 from datetime import datetime, timezone
 
 import boto3
-from playwright.sync_api import sync_playwright
+import requests
+from bs4 import BeautifulSoup
 
 BUCKET = os.getenv("PUBLIC_BUCKET", "monkcode-market-data")
 KEY = "data/econ_calendar.json"
-URL = "https://www.marketwatch.com/economy-politics/calendar"
+URL = "https://finance.yahoo.com/calendar/economic"
+HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/120.0 Safari/537.36"
+    ),
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9",
+}
+
+# Column indices in Yahoo Finance economic calendar table
+# Event | Country | Event Time | For | Actual | Market Expectation | Prior to This | Revised from
+COL_EVENT    = 0
+COL_COUNTRY  = 1
+COL_TIME     = 2
+COL_PERIOD   = 3
+COL_ACTUAL   = 4
+COL_FORECAST = 5
+COL_PREVIOUS = 6
 
 
-def fetch_calendar_items() -> list:
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        page = browser.new_page(
-            user_agent=(
-                "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
-                "(KHTML, like Gecko) Chrome/120.0 Safari/537.36"
-            )
-        )
-        page.goto(URL, wait_until="domcontentloaded", timeout=30000)
+def parse_calendar(html: str) -> list:
+    soup = BeautifulSoup(html, "html.parser")
+    table = soup.find("table")
+    if not table:
+        return []
 
-        # Wait for calendar tables to appear after JS renders
-        try:
-            page.wait_for_selector("table", timeout=15000)
-        except Exception:
-            pass
+    items = []
+    seen = set()
+    today = datetime.now(tz=timezone.utc).strftime("%b %-d, %Y")  # e.g. "Feb 25, 2026"
 
-        # Dismiss cookie/consent overlay if present
-        for selector in ["button[id*='consent']", "button[class*='consent']",
-                          "button[id*='accept']", ".gdpr-accept"]:
-            try:
-                page.click(selector, timeout=1500)
-                break
-            except Exception:
-                pass
+    for row in table.find_all("tr")[1:]:  # skip header row
+        cells = [td.get_text(strip=True) for td in row.find_all(["td", "th"])]
+        if len(cells) < 4:
+            continue
 
-        # Extract structured data from the live DOM via JS
-        items = page.evaluate("""() => {
-            const results = [];
-            let currentDate = "";
-            const dateRe = /(monday|tuesday|wednesday|thursday|friday|saturday|sunday)/i;
-            const skipWords = new Set(["time", "report", "date", "period",
-                                        "survey", "actual", "prior", "revised", ""]);
+        event    = cells[COL_EVENT]    if len(cells) > COL_EVENT    else ""
+        country  = cells[COL_COUNTRY]  if len(cells) > COL_COUNTRY  else ""
+        time_val = cells[COL_TIME]     if len(cells) > COL_TIME     else ""
+        period   = cells[COL_PERIOD]   if len(cells) > COL_PERIOD   else ""
+        actual   = cells[COL_ACTUAL]   if len(cells) > COL_ACTUAL   else ""
+        forecast = cells[COL_FORECAST] if len(cells) > COL_FORECAST else ""
+        previous = cells[COL_PREVIOUS] if len(cells) > COL_PREVIOUS else ""
 
-            // Walk all elements in document order to track date headers + tables
-            const walker = document.createTreeWalker(
-                document.body,
-                NodeFilter.SHOW_ELEMENT,
-                null
-            );
+        if not event:
+            continue
 
-            let node = walker.nextNode();
-            while (node) {
-                const tag = node.tagName;
+        key = f"{time_val}|{event}|{country}"
+        if key in seen:
+            continue
+        seen.add(key)
 
-                // Capture date section headers (h2/h3/h4 containing day-of-week)
-                if (/^H[1-4]$/.test(tag)) {
-                    const text = (node.innerText || node.textContent || "").trim();
-                    if (dateRe.test(text)) {
-                        currentDate = text;
-                    }
+        # Format: "8:30 AM UTC (US)" for display
+        time_display = f"{time_val} ({country})" if country else time_val
 
-                // Parse calendar tables
-                } else if (tag === "TABLE") {
-                    const rows = node.querySelectorAll("tr");
-                    for (const row of rows) {
-                        const cells = Array.from(row.querySelectorAll("td, th"))
-                            .map(c => (c.innerText || c.textContent || "")
-                                       .replace(/\\s+/g, " ").trim());
+        items.append({
+            "date":     today,
+            "time":     time_display,
+            "event":    event,
+            "period":   period,
+            "forecast": forecast if forecast not in ("-", "") else "",
+            "previous": previous if previous not in ("-", "") else "",
+            "actual":   actual   if actual   not in ("-", "") else "",
+        })
 
-                        if (cells.length < 2) continue;
-
-                        // Skip header rows
-                        if (skipWords.has(cells[0].toLowerCase())) continue;
-
-                        const event = cells[1] || "";
-                        if (!event || !/[A-Za-z]/.test(event)) continue;
-
-                        results.push({
-                            date:     currentDate,
-                            time:     cells[0] || "",
-                            event:    cells[1] || "",
-                            period:   cells[2] || "",
-                            forecast: cells[3] || "",
-                            previous: cells[5] || "",
-                        });
-                    }
-                }
-
-                node = walker.nextNode();
-            }
-
-            return results.slice(0, 200);
-        }""")
-
-        browser.close()
-    return items
+    return items[:100]
 
 
 def main():
-    items = fetch_calendar_items()
+    resp = requests.get(URL, headers=HEADERS, timeout=20)
+    resp.raise_for_status()
+    items = parse_calendar(resp.text)
 
     payload = {
         "fetched_at": datetime.now(tz=timezone.utc).replace(microsecond=0).isoformat(),
