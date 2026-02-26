@@ -2,8 +2,10 @@ name: Refresh market data
 
 on:
   schedule:
-    # 23:30 UTC = 6:30 PM ET (winter) / 7:30 PM ET (summer) — well after US market close
+    # Market prices + fund data: once daily after US market close (Mon–Fri)
     - cron: '30 23 * * 1-5'
+    # News + calendar: every 4 hours on weekdays for fresher content
+    - cron: '0 */4 * * 1-5'
   workflow_dispatch:
 
 concurrency:
@@ -34,13 +36,29 @@ jobs:
       - name: Install dependencies
         run: pip install -r data-pipelines/market/requirements.txt
 
-      - name: Run market data refresh
+      - name: Install Playwright browsers
+        run: python -m playwright install chromium --with-deps
+
+      # ── Market prices + fund NAVs (only meaningful after market close) ──
+      - name: Refresh market indicators
+        if: github.event.schedule == '30 23 * * 1-5' || github.event_name == 'workflow_dispatch'
         run: python data-pipelines/market/market_data.py
 
-      - name: Confirm S3 timestamp
+      # ── News + calendar (run on every trigger) ──
+      - name: Fetch Yahoo Finance Originals
+        run: python data-pipelines/market/news_originals.py
+
+      - name: Fetch MarketWatch Economic Calendar
+        run: python data-pipelines/market/econ_calendar.py
+
+      - name: Confirm S3 output
         run: |
-          pip install awscli -q
+          echo "=== yahoo_originals ===" && \
+          aws s3 cp s3://monkcode-market-data/data/yahoo_originals.json - \
+            | python3 -c "import sys,json; d=json.load(sys.stdin); print('  articles:', len(d.get('articles', [])))"
+          echo "=== econ_calendar ===" && \
+          aws s3 cp s3://monkcode-market-data/data/econ_calendar.json - \
+            | python3 -c "import sys,json; d=json.load(sys.stdin); print('  items:', len(d.get('items', [])))"
+          echo "=== market_indicators (last run) ===" && \
           aws s3 cp s3://monkcode-market-data/data/market_indicators.json - \
-            | python3 -c "import sys,json; d=json.load(sys.stdin); print('market_indicators updated:', d['timestamp'])"
-          aws s3 cp s3://monkcode-market-data/data/funds_performance.json - \
-            | python3 -c "import sys,json; d=json.load(sys.stdin); print('funds_performance updated:', d['timestamp'])"
+            | python3 -c "import sys,json; d=json.load(sys.stdin); print('  timestamp:', d.get('timestamp', 'n/a'))"
